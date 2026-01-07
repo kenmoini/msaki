@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 
 interface MessageInputProps {
@@ -16,6 +16,15 @@ export function MessageInput({
 }: MessageInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasDisabledRef = useRef(disabled);
+
+  // Restore focus when transitioning from disabled to enabled
+  useEffect(() => {
+    if (wasDisabledRef.current && !disabled) {
+      textareaRef.current?.focus();
+    }
+    wasDisabledRef.current = disabled;
+  }, [disabled]);
 
   const handleSend = () => {
     const trimmed = value.trim();
@@ -24,6 +33,7 @@ export function MessageInput({
       setValue("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
+        textareaRef.current.focus();
       }
     }
   };
