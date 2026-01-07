@@ -25,6 +25,11 @@ type Manager struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
+
+	// Callbacks for model state changes
+	onModelReady []func(modelName string)
+	onModelError []func(modelName string)
+	callbackMu   sync.RWMutex
 }
 
 // NewManager creates a new model manager
@@ -184,6 +189,8 @@ func (m *Manager) checkHealth(model *Model) {
 			model.UpdateActivity()
 			model.AppendLog("system", "Health check passed, model is now running")
 			log.Printf("Model %s health check passed, transitioning to running", model.Name())
+			// Notify callbacks that model is ready
+			m.notifyModelReady(model.Name())
 		}
 	} else {
 		model.SetHealthy(false, fmt.Sprintf("Health check returned %d", resp.StatusCode))
@@ -280,6 +287,7 @@ func (m *Manager) Start(name string) error {
 		if err != nil {
 			model.SetError(fmt.Sprintf("Failed to create stdout pipe: %v", err))
 			model.AppendLog("system", fmt.Sprintf("Failed to create stdout pipe: %v", err))
+			m.notifyModelError(model.Name())
 			return
 		}
 
@@ -287,6 +295,7 @@ func (m *Manager) Start(name string) error {
 		if err != nil {
 			model.SetError(fmt.Sprintf("Failed to create stderr pipe: %v", err))
 			model.AppendLog("system", fmt.Sprintf("Failed to create stderr pipe: %v", err))
+			m.notifyModelError(model.Name())
 			return
 		}
 
@@ -295,6 +304,7 @@ func (m *Manager) Start(name string) error {
 			model.SetError(fmt.Sprintf("Failed to start command: %v", err))
 			model.AppendLog("system", fmt.Sprintf("Failed to start command: %v", err))
 			m.portAllocator.Release(model.Name())
+			m.notifyModelError(model.Name())
 			return
 		}
 
@@ -315,6 +325,8 @@ func (m *Manager) Start(name string) error {
 			model.SetError(fmt.Sprintf("Start failed: %v", err))
 			model.AppendLog("system", fmt.Sprintf("Script failed with error: %v", err))
 			m.portAllocator.Release(model.Name())
+			// Notify callbacks that model failed to start
+			m.notifyModelError(model.Name())
 			return
 		}
 
@@ -329,6 +341,8 @@ func (m *Manager) Start(name string) error {
 			model.UpdateActivity()
 			model.AppendLog("system", "Model started successfully")
 			log.Printf("Model %s started successfully", model.Name())
+			// Notify callbacks that model is ready
+			m.notifyModelReady(model.Name())
 		}
 	}()
 
@@ -535,4 +549,42 @@ func (m *Manager) Shutdown() {
 // PortAllocator returns the port allocator
 func (m *Manager) PortAllocator() *PortAllocator {
 	return m.portAllocator
+}
+
+// OnModelReady registers a callback to be called when a model transitions to running
+func (m *Manager) OnModelReady(cb func(modelName string)) {
+	m.callbackMu.Lock()
+	defer m.callbackMu.Unlock()
+	m.onModelReady = append(m.onModelReady, cb)
+}
+
+// OnModelError registers a callback to be called when a model fails to start
+func (m *Manager) OnModelError(cb func(modelName string)) {
+	m.callbackMu.Lock()
+	defer m.callbackMu.Unlock()
+	m.onModelError = append(m.onModelError, cb)
+}
+
+// notifyModelReady calls all registered ready callbacks for a model
+func (m *Manager) notifyModelReady(modelName string) {
+	m.callbackMu.RLock()
+	callbacks := make([]func(string), len(m.onModelReady))
+	copy(callbacks, m.onModelReady)
+	m.callbackMu.RUnlock()
+
+	for _, cb := range callbacks {
+		go cb(modelName)
+	}
+}
+
+// notifyModelError calls all registered error callbacks for a model
+func (m *Manager) notifyModelError(modelName string) {
+	m.callbackMu.RLock()
+	callbacks := make([]func(string), len(m.onModelError))
+	copy(callbacks, m.onModelError)
+	m.callbackMu.RUnlock()
+
+	for _, cb := range callbacks {
+		go cb(modelName)
+	}
 }

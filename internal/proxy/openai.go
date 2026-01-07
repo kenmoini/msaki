@@ -77,14 +77,35 @@ func (p *Proxy) ChatCompletionsHandler() gin.HandlerFunc {
 			return
 		}
 
-		if model.Status() != models.StatusRunning {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"error": map[string]interface{}{
-					"message": "model is not running",
-					"type":    "server_error",
-				},
-			})
-			return
+		// Handle model status - auto-start if needed and queue request
+		status := model.Status()
+		if status == models.StatusStopped || status == models.StatusError {
+			// Auto-start the model
+			if err := p.manager.Start(req.Model); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": map[string]interface{}{
+						"message": "failed to start model: " + err.Error(),
+						"type":    "server_error",
+					},
+				})
+				return
+			}
+			status = models.StatusStarting
+		}
+
+		if status == models.StatusStarting || status == models.StatusStopping {
+			// Queue the request and wait for model to become ready
+			if err := p.waitForModel(req.Model); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": map[string]interface{}{
+						"message": "model not ready: " + err.Error(),
+						"type":    "server_error",
+					},
+				})
+				return
+			}
+			// Re-fetch model to get updated status
+			model = p.manager.GetModel(req.Model)
 		}
 
 		// Update model activity
@@ -204,14 +225,35 @@ func (p *Proxy) CompletionsHandler() gin.HandlerFunc {
 			return
 		}
 
-		if model.Status() != models.StatusRunning {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"error": map[string]interface{}{
-					"message": "model is not running",
-					"type":    "server_error",
-				},
-			})
-			return
+		// Handle model status - auto-start if needed and queue request
+		status := model.Status()
+		if status == models.StatusStopped || status == models.StatusError {
+			// Auto-start the model
+			if err := p.manager.Start(req.Model); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": map[string]interface{}{
+						"message": "failed to start model: " + err.Error(),
+						"type":    "server_error",
+					},
+				})
+				return
+			}
+			status = models.StatusStarting
+		}
+
+		if status == models.StatusStarting || status == models.StatusStopping {
+			// Queue the request and wait for model to become ready
+			if err := p.waitForModel(req.Model); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": map[string]interface{}{
+						"message": "model not ready: " + err.Error(),
+						"type":    "server_error",
+					},
+				})
+				return
+			}
+			// Re-fetch model to get updated status
+			model = p.manager.GetModel(req.Model)
 		}
 
 		model.UpdateActivity()

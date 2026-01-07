@@ -21,13 +21,46 @@ import (
 type Proxy struct {
 	manager *models.Manager
 	metrics *metrics.Metrics
+	queue   *RequestQueue
 }
 
 // New creates a new Proxy instance
 func New(manager *models.Manager, m *metrics.Metrics) *Proxy {
-	return &Proxy{
+	p := &Proxy{
 		manager: manager,
 		metrics: m,
+		queue:   NewRequestQueue(),
+	}
+
+	// Register callback for when models become ready
+	manager.OnModelReady(func(modelName string) {
+		p.queue.NotifyAll(modelName)
+	})
+
+	// Register callback for when models fail to start
+	manager.OnModelError(func(modelName string) {
+		p.queue.FailAll(modelName, ErrModelStartFailed)
+	})
+
+	return p
+}
+
+// waitForModel queues a request and waits for the model to become ready
+// Returns nil if model is ready, or an error if timeout/failure occurred
+func (p *Proxy) waitForModel(modelName string) error {
+	req := &QueuedRequest{
+		Done:      make(chan error, 1),
+		CreatedAt: time.Now(),
+	}
+
+	p.queue.Enqueue(modelName, req)
+
+	// Wait for model to become ready or timeout
+	select {
+	case err := <-req.Done:
+		return err
+	case <-time.After(QueueTimeout):
+		return ErrQueueTimeout
 	}
 }
 
