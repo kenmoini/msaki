@@ -211,7 +211,7 @@ func (s *Server) setupRoutes() {
 
 	// OpenAI-compatible proxy routes (protected)
 	var proxyMiddleware []gin.HandlerFunc
-	// var proxyMiddlewareNoAuth []gin.HandlerFunc
+	var proxyMiddlewareNoAuth []gin.HandlerFunc
 	if s.authManager != nil && s.authManager.HasProvider() {
 		proxyMiddleware = append(proxyMiddleware, auth.Middleware(s.authManager))
 	}
@@ -220,13 +220,12 @@ func (s *Server) setupRoutes() {
 	{
 		if s.modelManager != nil {
 			p := proxy.New(s.modelManager, s.metrics)
-			if s.config.Global.Server.Access.AllowPublicModelList {
+			if s.config.Global.Server.Access.AllowPublicModelList == true {
 				// Public access to model list - no auth required
-				v1.GET("/models", p.ModelsListHandler())
+				v1.GET("/models", append(proxyMiddlewareNoAuth, p.ModelsListHandler())...)
 			} else {
 				// Protected access - requires authentication
-				v1.GET("/models", p.ModelsListHandler())
-				// v1.GET("/models", append(proxyMiddleware, p.ModelsListHandler())...)
+				v1.GET("/models", append(proxyMiddleware, p.ModelsListHandler())...)
 			}
 
 			v1.POST("/chat/completions", append(proxyMiddleware, p.ChatCompletionsHandler())...)

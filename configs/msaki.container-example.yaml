@@ -24,14 +24,14 @@ global:
         path: /etc/msaki/htpasswd_users
         role: user
 
-  # access provides configuration for access control to MSAKI
-  access:
-    # allowPublicAccess if true will allow full unauthenticated access to MSAKI
-    allowPublicAccess: false
-    # allowGuestAccess if true will allow unauthenticated access with a guest role that can only consume models
-    allowGuestAccess: false
-    # allowPublicModelList if true will allow unauthenticated users to see the list of available models
-    allowPublicModelList: true
+    # access provides configuration for access control to MSAKI
+    access:
+      # allowPublicAccess if true will allow full unauthenticated access to MSAKI
+      allowPublicAccess: false
+      # allowGuestAccess if true will allow unauthenticated access with a guest role that can only consume models
+      allowGuestAccess: false
+      # allowPublicModelList if true will allow unauthenticated users to see the list of available models
+      allowPublicModelList: true
 
   observability:
     # Provides standard configuration for metrics endpoint

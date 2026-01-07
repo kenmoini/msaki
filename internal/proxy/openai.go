@@ -296,7 +296,7 @@ func (p *Proxy) ModelsListHandler() gin.HandlerFunc {
 		modelList := make([]map[string]interface{}, 0)
 		for _, m := range allModels {
 			modelList = append(modelList, map[string]interface{}{
-				"id":       m.Name,
+				"id":       m.Name(),
 				"object":   "model",
 				"created":  time.Now().Unix(),
 				"owned_by": "msaki",
