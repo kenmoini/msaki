@@ -6,6 +6,19 @@ import { MessageInput } from "./MessageInput";
 import { api } from "@/lib/api";
 import type { ChatMessage, Model } from "@/types";
 
+// Generate a UUID with fallback for non-secure contexts
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (HTTP)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 interface ChatContainerProps {
   selectedModel: Model | null;
 }
@@ -19,7 +32,7 @@ export function ChatContainer({ selectedModel }: ChatContainerProps) {
       if (!selectedModel) return;
 
       const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "user",
         content,
         timestamp: new Date().toISOString(),
@@ -29,7 +42,7 @@ export function ChatContainer({ selectedModel }: ChatContainerProps) {
       setIsStreaming(true);
 
       try {
-        const assistantMessageId = crypto.randomUUID();
+        const assistantMessageId = generateId();
         let assistantContent = "";
 
         // Add empty assistant message that we'll update
@@ -78,7 +91,7 @@ export function ChatContainer({ selectedModel }: ChatContainerProps) {
         setMessages((prev) => [
           ...prev,
           {
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: "assistant",
             content: `Error: ${error instanceof Error ? error.message : "Failed to get response"}`,
             timestamp: new Date().toISOString(),
