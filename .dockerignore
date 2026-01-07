@@ -50,3 +50,4 @@ docker-compose*.yml
 Thumbs.db
 *.log
 tmp/
+logs/

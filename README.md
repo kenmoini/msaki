@@ -24,16 +24,28 @@ Todo:
 
 To build and run:
 
-# Development (separate frontend/backend)
+### Development (separate frontend/backend)
 
 ```bash
 make dev-backend   # Start Go server on :8080
 make dev-frontend  # Start NextJS on :3000
 ```
 
-# Production (embedded frontend)
+### Production (single binary embedded frontend)
 
 ```bash
 make build         # Builds frontend, copies to web/static, builds Go binary
 ./bin/msaki -config configs/msaki.example.yaml
 ```
+
+### As a Container
+
+```bash
+# Build the Container - or make container-build
+docker build -t msaki -f Dockerfile -.
+
+# Run the container - or make container-run
+docker run --rm -it -d --name msaki -v ./configs/msaki.container-example.yaml:/etc/msaki/msaki.yaml -p 8080:8080 msaki
+```
+
+The example htpasswd users are `admin/admin123` and `user/user123`.

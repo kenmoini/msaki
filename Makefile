@@ -75,7 +75,7 @@ embed-frontend:
 ## dev-backend: Run the backend in development mode
 dev-backend:
 	@echo "Starting MSAKI backend in development mode..."
-	go run ./cmd/msaki -config configs/msaki.yaml -no-static
+	go run ./cmd/msaki -config configs/msaki.dev-example.yaml -no-static
 
 ## dev-frontend: Run the frontend in development mode
 dev-frontend:
@@ -156,5 +156,5 @@ container-run:
 	@echo "Running container $(CONTAINER_IMAGE)..."
 	$(CONTAINER_RUNTIME) run --rm -it \
 		-p 8080:8080 \
-		-v $(PWD)/configs/msaki.example.yaml:/etc/msaki/msaki.yaml:ro \
+		-v $(PWD)/configs/msaki.container-example.yaml:/etc/msaki/msaki.yaml:ro \
 		$(CONTAINER_IMAGE)

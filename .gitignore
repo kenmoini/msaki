@@ -1,2 +1,4 @@
 bin/**
 web/static/**
+logs/**
+!.gitkeep
