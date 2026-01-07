@@ -3,9 +3,11 @@ package models
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os/exec"
 	"strings"
 	"sync"
@@ -131,6 +133,7 @@ func (m *Manager) runHealthChecks() {
 // checkHealth performs a health check on a single model
 func (m *Manager) checkHealth(model *Model) {
 	cfg := model.Config().HealthCheck
+	modelCfg := model.Config()
 	endpoint := m.getModelEndpoint(model)
 	if endpoint == "" {
 		return
@@ -138,21 +141,29 @@ func (m *Manager) checkHealth(model *Model) {
 
 	healthURL := endpoint + cfg.Endpoint
 
-	// Simple HTTP GET health check
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Create HTTP client with appropriate TLS config
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: modelCfg.SkipTLSVerify,
+		},
+	}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   5 * time.Second,
+	}
 
-	req, err := exec.CommandContext(ctx, "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", healthURL).Output()
+	// Perform HTTP GET health check
+	resp, err := client.Get(healthURL)
 	if err != nil {
 		model.SetHealthy(false, fmt.Sprintf("Health check failed: %v", err))
 		return
 	}
+	defer resp.Body.Close()
 
-	statusCode := strings.TrimSpace(string(req))
-	if statusCode == "200" {
+	if resp.StatusCode == http.StatusOK {
 		model.SetHealthy(true, "OK")
 	} else {
-		model.SetHealthy(false, fmt.Sprintf("Health check returned %s", statusCode))
+		model.SetHealthy(false, fmt.Sprintf("Health check returned %d", resp.StatusCode))
 	}
 }
 
