@@ -17,11 +17,11 @@ global:
     authentication:
       - name: admin_userpass
         provider: htpasswd
-        path: /etc/msaki/configs/auth/htpasswd_admin
+        path: /etc/msaki/htpasswd_admin
         role: administrator
       - name: chat_users_userpass
         provider: htpasswd
-        path: /etc/msaki/configs/auth/configs/htpasswd_users
+        path: /etc/msaki/htpasswd_users
         role: user
 
   # access provides configuration for access control to MSAKI
@@ -92,7 +92,7 @@ models:
       - vllm
     # startScript runs when the model is requested to be loaded
     # If ${PORT} is detected in the script then MSAKI will dynamically provide it a port to use
-    startScript: ./configs/model_scripts/gpt-oss-120b.sh ${PORT}
+    startScript: /etc/msaki/model_scripts/gpt-oss-120b.sh ${PORT}
     # stopScript if provided will allow the model to be stopped and unloaded
     stopScript: docker stop vllm-gpt-oss-120b
     # backendOverride provides an alternative endpoint to proxy requests to
@@ -155,6 +155,33 @@ models:
     endpoint: https://ollama.192.168.42.111.traefik.me
     # skip_tls_verify allows for not validating TLS chains
     skip_tls_verify: true
+    healthCheck:
+      enabled: true
+      endpoint: /health
+      startDelay: 0s
+      interval: 60s
+      retries: 10
+
+  - name: ext-vllm-openai
+    description: External vLLM server
+    # provider specifies what external model provider is being used
+    # Supported values: openai (default), ollama, anthropic
+    # When set to "ollama", requests to /v1/chat/completions are automatically
+    # translated to Ollama's /api/chat format
+    provider: openai
+    # modelName specifies the actual model name to send to the backend
+    # This allows you to expose a friendly name while using a different model internally
+    modelName: Qwen2.5-1.5B-Instruct-test
+    aliases:
+      - vllm
+    tags:
+      - external
+      - openai
+      - vllm
+      - chat
+    endpoint: https://vllm.192.168.42.111.traefik.me
+    # skip_tls_verify allows for not validating TLS chains
+    skip_tls_verify: false
     healthCheck:
       enabled: true
       endpoint: /health

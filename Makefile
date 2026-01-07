@@ -155,6 +155,7 @@ container-tag-latest: container-build
 container-run:
 	@echo "Running container $(CONTAINER_IMAGE)..."
 	$(CONTAINER_RUNTIME) run --rm -it \
-		-p 8080:8080 \
-		-v $(PWD)/configs/msaki.container-example.yaml:/etc/msaki/msaki.yaml:ro \
-		$(CONTAINER_IMAGE)
+		-p 18080:8080 \
+		-v $(PWD)/configs:/etc/msaki:ro \
+		$(CONTAINER_IMAGE) \
+		-config /etc/msaki/msaki.container-example.yaml

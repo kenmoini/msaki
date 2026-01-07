@@ -160,12 +160,20 @@ func (s *Server) setupRoutes() {
 			protectedMiddleware = append(protectedMiddleware, auth.Middleware(s.authManager))
 		}
 
-		// Model routes
-		modelsGroup := api.Group("/models", protectedMiddleware...)
-		{
-			if s.modelManager != nil {
-				modelsHandler := handlers.NewModelsHandler(s.modelManager)
-				modelsGroup.GET("", modelsHandler.List)
+		// Model routes - list endpoint conditionally public based on allowPublicModelList
+		if s.modelManager != nil {
+			modelsHandler := handlers.NewModelsHandler(s.modelManager)
+
+			// Model list endpoint - conditionally public
+			if s.config.Global.Server.Access.AllowPublicModelList {
+				api.GET("/models", modelsHandler.List)
+			} else {
+				api.GET("/models", append(protectedMiddleware, modelsHandler.List)...)
+			}
+
+			// Protected model routes
+			modelsGroup := api.Group("/models", protectedMiddleware...)
+			{
 				modelsGroup.GET("/:name", modelsHandler.Get)
 				modelsGroup.GET("/:name/health", modelsHandler.Health)
 
@@ -181,7 +189,10 @@ func (s *Server) setupRoutes() {
 				modelsGroup.POST("/:name/start", append(adminMiddleware, modelsHandler.Start)...)
 				modelsGroup.POST("/:name/stop", append(adminMiddleware, modelsHandler.Stop)...)
 				modelsGroup.POST("/:name/restart", append(adminMiddleware, modelsHandler.Restart)...)
-			} else {
+			}
+		} else {
+			modelsGroup := api.Group("/models", protectedMiddleware...)
+			{
 				modelsGroup.GET("", s.placeholderHandler("list models"))
 				modelsGroup.GET("/:name", s.placeholderHandler("get model"))
 				modelsGroup.POST("/:name/start", s.placeholderHandler("start model"))
@@ -200,21 +211,30 @@ func (s *Server) setupRoutes() {
 
 	// OpenAI-compatible proxy routes (protected)
 	var proxyMiddleware []gin.HandlerFunc
+	// var proxyMiddlewareNoAuth []gin.HandlerFunc
 	if s.authManager != nil && s.authManager.HasProvider() {
 		proxyMiddleware = append(proxyMiddleware, auth.Middleware(s.authManager))
 	}
 
-	v1 := s.router.Group("/v1", proxyMiddleware...)
+	v1 := s.router.Group("/v1")
 	{
 		if s.modelManager != nil {
 			p := proxy.New(s.modelManager, s.metrics)
-			v1.POST("/chat/completions", p.ChatCompletionsHandler())
-			v1.POST("/completions", p.CompletionsHandler())
-			v1.GET("/models", p.ModelsListHandler())
+			if s.config.Global.Server.Access.AllowPublicModelList {
+				// Public access to model list - no auth required
+				v1.GET("/models", p.ModelsListHandler())
+			} else {
+				// Protected access - requires authentication
+				v1.GET("/models", p.ModelsListHandler())
+				// v1.GET("/models", append(proxyMiddleware, p.ModelsListHandler())...)
+			}
+
+			v1.POST("/chat/completions", append(proxyMiddleware, p.ChatCompletionsHandler())...)
+			v1.POST("/completions", append(proxyMiddleware, p.CompletionsHandler())...)
 		} else {
-			v1.POST("/chat/completions", s.placeholderHandler("chat completions"))
-			v1.POST("/completions", s.placeholderHandler("completions"))
 			v1.GET("/models", s.placeholderHandler("list openai models"))
+			v1.POST("/chat/completions", append(proxyMiddleware, s.placeholderHandler("chat completions"))...)
+			v1.POST("/completions", append(proxyMiddleware, s.placeholderHandler("completions"))...)
 		}
 	}
 

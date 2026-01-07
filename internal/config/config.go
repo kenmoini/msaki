@@ -29,6 +29,7 @@ type ServerConfig struct {
 	Listen         ListenConfig      `yaml:"listen"`
 	PortMapping    PortMappingConfig `yaml:"portMapping"`
 	Authentication []AuthConfig      `yaml:"authentication"`
+	Access         AccessConfig      `yaml:"access"`
 }
 
 // ListenConfig defines the address and port the server binds to
@@ -49,6 +50,16 @@ type AuthConfig struct {
 	Provider string `yaml:"provider"`
 	Path     string `yaml:"path"`
 	Role     string `yaml:"role"`
+}
+
+// AccessConfig defines access control settings
+type AccessConfig struct {
+	// AllowPublicAccess if true will allow full unauthenticated access to MSAKI
+	AllowPublicAccess bool `yaml:"allowPublicAccess"`
+	// AllowGuestAccess if true will allow unauthenticated access with a guest role that can only consume models
+	AllowGuestAccess bool `yaml:"allowGuestAccess"`
+	// AllowPublicModelList if true will allow unauthenticated users to see the list of available models
+	AllowPublicModelList bool `yaml:"allowPublicModelList"`
 }
 
 // ObservabilityConfig contains metrics and logging settings
