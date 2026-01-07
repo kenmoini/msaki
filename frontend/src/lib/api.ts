@@ -63,7 +63,7 @@ class ApiClient {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await this.request<LoginResponse>("/api/auth/login", {
+    const response = await this.request<LoginResponse>("/msaki/api/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
     });
@@ -73,46 +73,46 @@ class ApiClient {
 
   async logout(): Promise<void> {
     try {
-      await this.request("/api/auth/logout", { method: "POST" });
+      await this.request("/msaki/api/auth/logout", { method: "POST" });
     } finally {
       this.setToken(null);
     }
   }
 
   async getCurrentUser(): Promise<User> {
-    return this.request<User>("/api/auth/me");
+    return this.request<User>("/msaki/api/auth/me");
   }
 
   // Model endpoints
   async getModels(): Promise<Model[]> {
-    return this.request<Model[]>("/api/models");
+    return this.request<Model[]>("/msaki/api/models");
   }
 
   async getModel(name: string): Promise<Model> {
-    return this.request<Model>(`/api/models/${encodeURIComponent(name)}`);
+    return this.request<Model>(`/msaki/api/models/${encodeURIComponent(name)}`);
   }
 
   async startModel(name: string): Promise<void> {
-    await this.request(`/api/models/${encodeURIComponent(name)}/start`, {
+    await this.request(`/msaki/api/models/${encodeURIComponent(name)}/start`, {
       method: "POST",
     });
   }
 
   async stopModel(name: string): Promise<void> {
-    await this.request(`/api/models/${encodeURIComponent(name)}/stop`, {
+    await this.request(`/msaki/api/models/${encodeURIComponent(name)}/stop`, {
       method: "POST",
     });
   }
 
   async restartModel(name: string): Promise<void> {
-    await this.request(`/api/models/${encodeURIComponent(name)}/restart`, {
+    await this.request(`/msaki/api/models/${encodeURIComponent(name)}/restart`, {
       method: "POST",
     });
   }
 
   async getModelLogs(name: string): Promise<ModelLogsResponse> {
     return this.request<ModelLogsResponse>(
-      `/api/models/${encodeURIComponent(name)}/logs`
+      `/msaki/api/models/${encodeURIComponent(name)}/logs`
     );
   }
 
@@ -123,7 +123,7 @@ class ApiClient {
     onDone: () => void
   ): () => void {
     const token = this.getToken();
-    const url = `${API_BASE}/api/models/${encodeURIComponent(name)}/logs/stream`;
+    const url = `${API_BASE}/msaki/api/models/${encodeURIComponent(name)}/logs/stream`;
 
     const eventSource = new EventSource(url);
 

@@ -11,8 +11,13 @@ import (
 
 // setupStaticRoutes configures serving of embedded static files
 func (s *Server) setupStaticRoutes(staticFS fs.FS) {
-	// Serve root path explicitly
+	// Redirect root to /ui/
 	s.router.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
+	})
+
+	// Serve UI index at /ui/
+	s.router.GET("/ui/", func(c *gin.Context) {
 		serveStaticFile(c, staticFS, "index.html")
 	})
 
@@ -20,8 +25,9 @@ func (s *Server) setupStaticRoutes(staticFS fs.FS) {
 	s.router.NoRoute(func(c *gin.Context) {
 		urlPath := c.Request.URL.Path
 
-		// Skip API routes - they should return 404
+		// Skip API and system routes - they should return 404
 		if strings.HasPrefix(urlPath, "/api/") ||
+			strings.HasPrefix(urlPath, "/msaki/api/") ||
 			strings.HasPrefix(urlPath, "/v1/") ||
 			urlPath == "/health" ||
 			urlPath == "/metrics" {
@@ -31,8 +37,22 @@ func (s *Server) setupStaticRoutes(staticFS fs.FS) {
 			return
 		}
 
-		// Clean the path and try to serve
-		cleanPath := strings.TrimPrefix(urlPath, "/")
+		// Redirect /ui without trailing slash to /ui/
+		if urlPath == "/ui" {
+			c.Redirect(http.StatusMovedPermanently, "/ui/")
+			return
+		}
+
+		// Only serve static files for /ui/* paths
+		if !strings.HasPrefix(urlPath, "/ui/") {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "endpoint not found",
+			})
+			return
+		}
+
+		// Clean the path - remove /ui prefix for filesystem lookup
+		cleanPath := strings.TrimPrefix(urlPath, "/ui/")
 		if cleanPath == "" {
 			cleanPath = "index.html"
 		}

@@ -135,8 +135,8 @@ func (s *Server) setupRoutes() {
 		s.router.GET(metricsPath, metrics.Handler())
 	}
 
-	// API routes
-	api := s.router.Group("/api")
+	// Internal API routes (moved to /msaki/api to distinguish from proxy routes)
+	api := s.router.Group("/msaki/api")
 	{
 		// Auth routes (no authentication required for login)
 		authGroup := api.Group("/auth")

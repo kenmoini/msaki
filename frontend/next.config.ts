@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   distDir: "out",
   trailingSlash: true,
 
+  // Serve UI from /ui path
+  basePath: "/ui",
+
   // Required for static export with images
   images: {
     unoptimized: true,
