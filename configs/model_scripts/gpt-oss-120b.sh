@@ -4,21 +4,28 @@ set -e
 
 PORT=$1
 
+# Change to the directory of the script
+cd "$(dirname "$0")"
+
 source ./common.sh
 
+echo "----------------------------------------"
+echo "Stopping and removing any existing container named vllm-gpt-oss-120b..."
 docker stop vllm-gpt-oss-120b || true
 docker rm vllm-gpt-oss-120b || true
 
-if [ ! -f "/vllm-cache/tiktoken-encodings/o200k_base.tiktoken" ]; then
-  echo "Downloading tiktoken o200k_base encodings..."
-  curl -o /vllm-cache/tiktoken-encodings/o200k_base.tiktoken "https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken"
-fi
+# if [ ! -f "/vllm-cache/tiktoken-encodings/o200k_base.tiktoken" ]; then
+#   echo "Downloading tiktoken o200k_base encodings..."
+#   curl -o /vllm-cache/tiktoken-encodings/o200k_base.tiktoken "https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken"
+# fi
 
-if [ ! -f "/vllm-cache/tiktoken-encodings/cl100k_base.tiktoken" ]; then
-  echo "Downloading tiktoken cl100k_base encodings..."
-  curl -o /vllm-cache/tiktoken-encodings/cl100k_base.tiktoken "https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken"
-fi
+# if [ ! -f "/vllm-cache/tiktoken-encodings/cl100k_base.tiktoken" ]; then
+#   echo "Downloading tiktoken cl100k_base encodings..."
+#   curl -o /vllm-cache/tiktoken-encodings/cl100k_base.tiktoken "https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken"
+# fi
 
+echo "----------------------------------------"
+echo "Starting VLLM GPT-OSS-120B on port ${PORT}..."
 docker run --init --rm --name vllm-gpt-oss-120b \
   --runtime=nvidia --gpus all \
   --shm-size=16g --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \

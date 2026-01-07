@@ -6,6 +6,8 @@ import type {
   ChatRequest,
   ChatResponse,
   ApiError,
+  LogEntry,
+  ModelLogsResponse,
 } from "@/types";
 
 const API_BASE = "";
@@ -100,6 +102,122 @@ class ApiClient {
     await this.request(`/api/models/${encodeURIComponent(name)}/stop`, {
       method: "POST",
     });
+  }
+
+  async restartModel(name: string): Promise<void> {
+    await this.request(`/api/models/${encodeURIComponent(name)}/restart`, {
+      method: "POST",
+    });
+  }
+
+  async getModelLogs(name: string): Promise<ModelLogsResponse> {
+    return this.request<ModelLogsResponse>(
+      `/api/models/${encodeURIComponent(name)}/logs`
+    );
+  }
+
+  streamModelLogs(
+    name: string,
+    onLog: (entry: LogEntry) => void,
+    onStatus: (status: string, statusError?: string) => void,
+    onDone: () => void
+  ): () => void {
+    const token = this.getToken();
+    const url = `${API_BASE}/api/models/${encodeURIComponent(name)}/logs/stream`;
+
+    const eventSource = new EventSource(url);
+
+    // For auth, we need to use fetch with SSE parsing since EventSource doesn't support headers
+    // Fall back to polling if auth is required
+    if (token) {
+      eventSource.close();
+      return this.pollModelLogs(name, onLog, onStatus, onDone);
+    }
+
+    eventSource.addEventListener("log", (event) => {
+      try {
+        const entry = JSON.parse(event.data);
+        onLog(entry);
+      } catch {
+        // Ignore parse errors
+      }
+    });
+
+    eventSource.addEventListener("status", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onStatus(data.status, data.statusError);
+      } catch {
+        // Ignore parse errors
+      }
+    });
+
+    eventSource.addEventListener("done", () => {
+      eventSource.close();
+      onDone();
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      onDone();
+    };
+
+    return () => eventSource.close();
+  }
+
+  private pollModelLogs(
+    name: string,
+    onLog: (entry: LogEntry) => void,
+    onStatus: (status: string, statusError?: string) => void,
+    onDone: () => void
+  ): () => void {
+    let cancelled = false;
+    let lastTimestamp = 0;
+    let lastStatus = "";
+
+    const poll = async () => {
+      while (!cancelled) {
+        try {
+          const response = await this.getModelLogs(name);
+
+          // Send new logs
+          for (const entry of response.logs) {
+            const ts = new Date(entry.timestamp).getTime();
+            if (ts > lastTimestamp) {
+              onLog(entry);
+              lastTimestamp = ts;
+            }
+          }
+
+          // Check status change
+          if (response.status !== lastStatus) {
+            onStatus(response.status);
+            lastStatus = response.status;
+
+            // Stop polling on terminal states
+            if (
+              response.status === "running" ||
+              response.status === "stopped" ||
+              response.status === "error"
+            ) {
+              onDone();
+              return;
+            }
+          }
+        } catch {
+          // Ignore errors during polling
+        }
+
+        // Wait before next poll
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+    };
   }
 
   // Chat endpoints

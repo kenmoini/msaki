@@ -27,7 +27,16 @@ type Model struct {
 	lastActivity time.Time
 	healthy      bool
 	healthMsg    string
+	scriptLogs   []LogEntry
+	logMu        sync.RWMutex
 	mu           sync.RWMutex
+}
+
+// LogEntry represents a single log line from script execution
+type LogEntry struct {
+	Timestamp time.Time `json:"timestamp"`
+	Stream    string    `json:"stream"` // "stdout", "stderr", or "system"
+	Message   string    `json:"message"`
 }
 
 // NewModel creates a new Model from configuration
@@ -132,6 +141,53 @@ func (m *Model) HealthMessage() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.healthMsg
+}
+
+// AppendLog adds a log entry to the script logs
+func (m *Model) AppendLog(stream, message string) {
+	m.logMu.Lock()
+	defer m.logMu.Unlock()
+	m.scriptLogs = append(m.scriptLogs, LogEntry{
+		Timestamp: time.Now(),
+		Stream:    stream,
+		Message:   message,
+	})
+	// Keep only last 1000 entries
+	if len(m.scriptLogs) > 1000 {
+		m.scriptLogs = m.scriptLogs[len(m.scriptLogs)-1000:]
+	}
+}
+
+// ClearLogs clears all script logs
+func (m *Model) ClearLogs() {
+	m.logMu.Lock()
+	defer m.logMu.Unlock()
+	m.scriptLogs = nil
+}
+
+// GetLogs returns a copy of the script logs
+func (m *Model) GetLogs() []LogEntry {
+	m.logMu.RLock()
+	defer m.logMu.RUnlock()
+	if m.scriptLogs == nil {
+		return []LogEntry{}
+	}
+	logs := make([]LogEntry, len(m.scriptLogs))
+	copy(logs, m.scriptLogs)
+	return logs
+}
+
+// GetLogsSince returns logs after a given timestamp
+func (m *Model) GetLogsSince(since time.Time) []LogEntry {
+	m.logMu.RLock()
+	defer m.logMu.RUnlock()
+	var result []LogEntry
+	for _, entry := range m.scriptLogs {
+		if entry.Timestamp.After(since) {
+			result = append(result, entry)
+		}
+	}
+	return result
 }
 
 // LastActivity returns the last activity time

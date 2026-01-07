@@ -25,6 +25,19 @@ export interface ModelHealth {
   message?: string;
 }
 
+// Log types
+export interface LogEntry {
+  timestamp: string;
+  stream: "stdout" | "stderr" | "system";
+  message: string;
+}
+
+export interface ModelLogsResponse {
+  model: string;
+  status: ModelStatus;
+  logs: LogEntry[];
+}
+
 // Auth types
 export interface User {
   username: string;

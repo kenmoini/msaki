@@ -133,7 +133,7 @@ models:
       - external
       - ollama
       - chat
-    endpoint: https://remote-ollama:11434
+    endpoint: https://ollama.192.168.42.111.traefik.me
     # skip_tls_verify allows for not validating TLS chains
     skip_tls_verify: true
     healthCheck:

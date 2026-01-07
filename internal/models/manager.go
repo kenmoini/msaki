@@ -1,8 +1,10 @@
 package models
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os/exec"
 	"strings"
@@ -203,6 +205,8 @@ func (m *Manager) Start(name string) error {
 		return fmt.Errorf("model has no start script")
 	}
 
+	// Clear previous logs and set status
+	model.ClearLogs()
 	model.SetStatus(StatusStarting)
 
 	// Allocate port if needed
@@ -212,12 +216,13 @@ func (m *Manager) Start(name string) error {
 		port, err = m.portAllocator.Allocate(model.Name())
 		if err != nil {
 			model.SetError(fmt.Sprintf("Failed to allocate port: %v", err))
+			model.AppendLog("system", fmt.Sprintf("Failed to allocate port: %v", err))
 			return err
 		}
 		model.SetPort(port)
 	}
 
-	// Execute start script
+	// Execute start script with streaming output
 	go func() {
 		script := model.Config().StartScript
 		if port > 0 {
@@ -225,16 +230,52 @@ func (m *Manager) Start(name string) error {
 		}
 
 		log.Printf("Starting model %s: %s", model.Name(), script)
+		model.AppendLog("system", fmt.Sprintf("Executing start script: %s", script))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", script)
-		output, err := cmd.CombinedOutput()
 
+		// Set up pipes for stdout and stderr
+		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			log.Printf("Model %s start failed: %v\nOutput: %s", model.Name(), err, string(output))
+			model.SetError(fmt.Sprintf("Failed to create stdout pipe: %v", err))
+			model.AppendLog("system", fmt.Sprintf("Failed to create stdout pipe: %v", err))
+			return
+		}
+
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			model.SetError(fmt.Sprintf("Failed to create stderr pipe: %v", err))
+			model.AppendLog("system", fmt.Sprintf("Failed to create stderr pipe: %v", err))
+			return
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			model.SetError(fmt.Sprintf("Failed to start command: %v", err))
+			model.AppendLog("system", fmt.Sprintf("Failed to start command: %v", err))
+			m.portAllocator.Release(model.Name())
+			return
+		}
+
+		// Stream stdout and stderr in goroutines
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go m.streamOutput(&wg, model, stdout, "stdout")
+		go m.streamOutput(&wg, model, stderr, "stderr")
+
+		// Wait for output streaming to complete
+		wg.Wait()
+
+		// Wait for command to finish
+		err = cmd.Wait()
+		if err != nil {
+			log.Printf("Model %s start failed: %v", model.Name(), err)
 			model.SetError(fmt.Sprintf("Start failed: %v", err))
+			model.AppendLog("system", fmt.Sprintf("Script failed with error: %v", err))
 			m.portAllocator.Release(model.Name())
 			return
 		}
@@ -242,10 +283,22 @@ func (m *Manager) Start(name string) error {
 		model.SetStatus(StatusRunning)
 		model.SetHealthy(true, "Started")
 		model.UpdateActivity()
+		model.AppendLog("system", "Model started successfully")
 		log.Printf("Model %s started successfully", model.Name())
 	}()
 
 	return nil
+}
+
+// streamOutput reads from a pipe and appends to model logs
+func (m *Manager) streamOutput(wg *sync.WaitGroup, model *Model, pipe io.ReadCloser, stream string) {
+	defer wg.Done()
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+		model.AppendLog(stream, line)
+		log.Printf("[%s:%s] %s", model.Name(), stream, line)
+	}
 }
 
 // Stop stops a model
@@ -270,13 +323,14 @@ func (m *Manager) Stop(name string) error {
 	if !model.HasStopScript() {
 		// No stop script, just mark as stopped
 		model.SetStatus(StatusStopped)
+		model.AppendLog("system", "Model stopped (no stop script)")
 		m.portAllocator.Release(model.Name())
 		return nil
 	}
 
 	model.SetStatus(StatusStopping)
 
-	// Execute stop script
+	// Execute stop script with streaming output
 	go func() {
 		script := model.Config().StopScript
 		port := model.Port()
@@ -285,25 +339,98 @@ func (m *Manager) Stop(name string) error {
 		}
 
 		log.Printf("Stopping model %s: %s", model.Name(), script)
+		model.AppendLog("system", fmt.Sprintf("Executing stop script: %s", script))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", script)
-		output, err := cmd.CombinedOutput()
 
+		// Set up pipes for stdout and stderr
+		stdout, _ := cmd.StdoutPipe()
+		stderr, _ := cmd.StderrPipe()
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			model.AppendLog("system", fmt.Sprintf("Failed to start stop command: %v", err))
+			model.SetStatus(StatusStopped)
+			m.portAllocator.Release(model.Name())
+			return
+		}
+
+		// Stream output
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go m.streamOutput(&wg, model, stdout, "stdout")
+		go m.streamOutput(&wg, model, stderr, "stderr")
+		wg.Wait()
+
+		err := cmd.Wait()
 		if err != nil {
-			log.Printf("Model %s stop warning: %v\nOutput: %s", model.Name(), err, string(output))
+			log.Printf("Model %s stop warning: %v", model.Name(), err)
+			model.AppendLog("system", fmt.Sprintf("Stop script warning: %v", err))
 			// Still mark as stopped even if stop script fails
 		}
 
 		model.SetStatus(StatusStopped)
 		model.SetHealthy(false, "Stopped")
+		model.AppendLog("system", "Model stopped")
 		m.portAllocator.Release(model.Name())
 		log.Printf("Model %s stopped", model.Name())
 	}()
 
 	return nil
+}
+
+// Restart restarts a model (can be used from error state)
+func (m *Manager) Restart(name string) error {
+	model := m.GetModel(name)
+	if model == nil {
+		return fmt.Errorf("model not found: %s", name)
+	}
+
+	if model.IsExternal() {
+		return fmt.Errorf("external models cannot be restarted")
+	}
+
+	// If in error state, reset to stopped first
+	if model.Status() == StatusError {
+		model.SetStatus(StatusStopped)
+		m.portAllocator.Release(model.Name())
+	}
+
+	// If running or stopping, stop first then start
+	if model.Status() == StatusRunning || model.Status() == StatusStopping {
+		// For restart, we'll stop synchronously then start
+		model.ClearLogs()
+		model.AppendLog("system", "Restarting model...")
+
+		if model.HasStopScript() {
+			script := model.Config().StopScript
+			port := model.Port()
+			if port > 0 {
+				script = strings.ReplaceAll(script, "${PORT}", fmt.Sprintf("%d", port))
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			cmd := exec.CommandContext(ctx, "sh", "-c", script)
+			output, err := cmd.CombinedOutput()
+			cancel()
+
+			if err != nil {
+				model.AppendLog("system", fmt.Sprintf("Stop during restart warning: %v", err))
+			}
+			if len(output) > 0 {
+				model.AppendLog("stdout", string(output))
+			}
+		}
+
+		model.SetStatus(StatusStopped)
+		m.portAllocator.Release(model.Name())
+	}
+
+	// Now start
+	return m.Start(name)
 }
 
 // getModelEndpoint returns the endpoint URL for a model

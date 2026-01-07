@@ -169,13 +169,18 @@ func (s *Server) setupRoutes() {
 				modelsGroup.GET("/:name", modelsHandler.Get)
 				modelsGroup.GET("/:name/health", modelsHandler.Health)
 
-				// Start/stop require admin role
+				// Logs endpoint (protected but not admin-only)
+				modelsGroup.GET("/:name/logs", modelsHandler.Logs)
+				modelsGroup.GET("/:name/logs/stream", modelsHandler.LogsStream)
+
+				// Start/stop/restart require admin role
 				adminMiddleware := []gin.HandlerFunc{}
 				if s.authManager != nil {
 					adminMiddleware = append(adminMiddleware, auth.RequireRole("administrator"))
 				}
 				modelsGroup.POST("/:name/start", append(adminMiddleware, modelsHandler.Start)...)
 				modelsGroup.POST("/:name/stop", append(adminMiddleware, modelsHandler.Stop)...)
+				modelsGroup.POST("/:name/restart", append(adminMiddleware, modelsHandler.Restart)...)
 			} else {
 				modelsGroup.GET("", s.placeholderHandler("list models"))
 				modelsGroup.GET("/:name", s.placeholderHandler("get model"))
