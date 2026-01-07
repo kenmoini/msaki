@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kenmoini/msaki/internal/config"
 	"github.com/kenmoini/msaki/internal/models"
 )
 
@@ -90,6 +91,26 @@ func (p *Proxy) ChatCompletionsHandler() gin.HandlerFunc {
 		model.UpdateActivity()
 
 		cfg := model.Config()
+
+		// Route based on provider type
+		switch cfg.Provider {
+		case config.ProviderOllama:
+			// Translate and proxy to Ollama
+			p.proxyToOllama(c, model, &req, bodyBytes, start)
+			return
+		case config.ProviderAnthropic:
+			// TODO: Implement Anthropic provider
+			c.JSON(http.StatusNotImplemented, gin.H{
+				"error": map[string]interface{}{
+					"message": "Anthropic provider not yet implemented",
+					"type":    "server_error",
+				},
+			})
+			return
+		default:
+			// Default to OpenAI-compatible proxy (includes empty provider)
+		}
+
 		targetURL, err := p.buildTargetURL(cfg, model.Port())
 		if err != nil {
 			p.recordError(req.Model, "invalid_target")
@@ -103,6 +124,14 @@ func (p *Proxy) ChatCompletionsHandler() gin.HandlerFunc {
 		}
 
 		proxy := p.createReverseProxy(targetURL, cfg)
+
+		// If a different model name is configured for the backend, rewrite the request
+		if cfg.ModelName != "" {
+			req.Model = cfg.ModelName
+			newBody, _ := json.Marshal(req)
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(newBody))
+			c.Request.ContentLength = int64(len(newBody))
+		}
 
 		// Handle streaming
 		if req.Stream {

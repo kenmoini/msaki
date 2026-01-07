@@ -249,6 +249,7 @@ func (m *Model) ToDTO() *ModelDTO {
 		Description:    m.config.Description,
 		Aliases:        m.config.Aliases,
 		Tags:           m.config.Tags,
+		Provider:       string(m.config.Provider),
 		Status:         string(m.status),
 		StatusError:    m.statusError,
 		Endpoint:       m.config.Endpoint,
@@ -265,6 +266,7 @@ type ModelDTO struct {
 	Description    string   `json:"description"`
 	Aliases        []string `json:"aliases"`
 	Tags           []string `json:"tags"`
+	Provider       string   `json:"provider,omitempty"`
 	Status         string   `json:"status"`
 	StatusError    string   `json:"statusError,omitempty"`
 	Endpoint       string   `json:"endpoint,omitempty"`

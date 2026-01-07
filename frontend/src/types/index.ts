@@ -1,9 +1,12 @@
 // Model types
+export type ProviderType = "openai" | "ollama" | "anthropic" | "";
+
 export interface Model {
   name: string;
   description: string;
   aliases: string[];
   tags: string[];
+  provider?: ProviderType;
   status: ModelStatus;
   statusError?: string;
   endpoint?: string;

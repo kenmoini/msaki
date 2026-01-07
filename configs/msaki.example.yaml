@@ -105,6 +105,8 @@ models:
 
   - name: ext-openapi
     description: External proxy to OpenAI
+    # provider specifies what external model provider is being used
+    provider: openai
     aliases:
       - openai
       - chatgpt
@@ -127,6 +129,14 @@ models:
 
   - name: ext-ollama
     description: External Ollama server
+    # provider specifies what external model provider is being used
+    # Supported values: openai (default), ollama, anthropic
+    # When set to "ollama", requests to /v1/chat/completions are automatically
+    # translated to Ollama's /api/chat format
+    provider: ollama
+    # modelName specifies the actual model name to send to the backend
+    # This allows you to expose a friendly name while using a different model internally
+    modelName: llama3.2:latest
     aliases:
       - ollama
     tags:

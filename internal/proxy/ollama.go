@@ -2,12 +2,14 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kenmoini/msaki/internal/config"
 	"github.com/kenmoini/msaki/internal/models"
 )
 
@@ -187,4 +189,238 @@ func (p *Proxy) OllamaTagsHandler() gin.HandlerFunc {
 			"models": modelList,
 		})
 	}
+}
+
+// OllamaChatResponse represents an Ollama chat response
+type OllamaChatResponse struct {
+	Model     string        `json:"model"`
+	CreatedAt string        `json:"created_at"`
+	Message   OllamaMessage `json:"message"`
+	Done      bool          `json:"done"`
+}
+
+// proxyToOllama handles proxying an OpenAI-format chat request to an Ollama backend
+func (p *Proxy) proxyToOllama(c *gin.Context, model *models.Model, openaiReq *OpenAIChatRequest, bodyBytes []byte, start time.Time) {
+	cfg := model.Config()
+	targetURL, err := p.buildTargetURL(cfg, model.Port())
+	if err != nil {
+		p.recordError(openaiReq.Model, "invalid_target")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "failed to build target URL",
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+
+	// Translate OpenAI request to Ollama format
+	ollamaReq := translateOpenAIToOllama(openaiReq, cfg.ModelName)
+	ollamaBody, err := json.Marshal(ollamaReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "failed to translate request",
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+
+	// Create request to Ollama /api/chat endpoint
+	ollamaURL := targetURL.String() + "/api/chat"
+	req, err := http.NewRequestWithContext(c.Request.Context(), "POST", ollamaURL, bytes.NewBuffer(ollamaBody))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "failed to create request",
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add API key if configured
+	apiKey := getAPIKey(cfg)
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	client := createHTTPClient(cfg)
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error": map[string]interface{}{
+				"message": "failed to connect to Ollama backend: " + err.Error(),
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if openaiReq.Stream {
+		p.streamOllamaToOpenAI(c, resp, openaiReq.Model, start)
+	} else {
+		p.translateOllamaResponse(c, resp, openaiReq.Model)
+	}
+}
+
+// translateOpenAIToOllama converts an OpenAI chat request to Ollama format
+func translateOpenAIToOllama(openaiReq *OpenAIChatRequest, backendModel string) *OllamaChatRequest {
+	messages := make([]OllamaMessage, len(openaiReq.Messages))
+	for i, msg := range openaiReq.Messages {
+		messages[i] = OllamaMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	// Use the backend model name if specified, otherwise use the request model
+	modelName := backendModel
+	if modelName == "" {
+		modelName = openaiReq.Model
+	}
+
+	stream := openaiReq.Stream
+	return &OllamaChatRequest{
+		Model:    modelName,
+		Messages: messages,
+		Stream:   &stream,
+	}
+}
+
+// streamOllamaToOpenAI streams Ollama responses and translates to OpenAI SSE format
+func (p *Proxy) streamOllamaToOpenAI(c *gin.Context, resp *http.Response, modelName string, start time.Time) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "streaming not supported",
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	messageID := generateMessageID()
+
+	for {
+		var ollamaResp OllamaChatResponse
+		if err := decoder.Decode(&ollamaResp); err != nil {
+			if err == io.EOF {
+				break
+			}
+			break
+		}
+
+		// Translate to OpenAI streaming format
+		chunk := map[string]interface{}{
+			"id":      messageID,
+			"object":  "chat.completion.chunk",
+			"created": time.Now().Unix(),
+			"model":   modelName,
+			"choices": []map[string]interface{}{
+				{
+					"index": 0,
+					"delta": map[string]interface{}{
+						"content": ollamaResp.Message.Content,
+					},
+					"finish_reason": nil,
+				},
+			},
+		}
+
+		if ollamaResp.Done {
+			chunk["choices"].([]map[string]interface{})[0]["finish_reason"] = "stop"
+			chunk["choices"].([]map[string]interface{})[0]["delta"] = map[string]interface{}{}
+		}
+
+		data, _ := json.Marshal(chunk)
+		c.Writer.Write([]byte("data: " + string(data) + "\n\n"))
+		flusher.Flush()
+
+		if ollamaResp.Done {
+			c.Writer.Write([]byte("data: [DONE]\n\n"))
+			flusher.Flush()
+			break
+		}
+	}
+
+	if p.metrics != nil {
+		duration := time.Since(start)
+		p.metrics.RecordProxyRequest(modelName, "chat/completions", http.StatusOK, duration)
+	}
+}
+
+// translateOllamaResponse translates a non-streaming Ollama response to OpenAI format
+func (p *Proxy) translateOllamaResponse(c *gin.Context, resp *http.Response, modelName string) {
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.Data(resp.StatusCode, "application/json", body)
+		return
+	}
+
+	var ollamaResp OllamaChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "failed to parse Ollama response",
+				"type":    "server_error",
+			},
+		})
+		return
+	}
+
+	// Translate to OpenAI format
+	openaiResp := map[string]interface{}{
+		"id":      generateMessageID(),
+		"object":  "chat.completion",
+		"created": time.Now().Unix(),
+		"model":   modelName,
+		"choices": []map[string]interface{}{
+			{
+				"index": 0,
+				"message": map[string]interface{}{
+					"role":    ollamaResp.Message.Role,
+					"content": ollamaResp.Message.Content,
+				},
+				"finish_reason": "stop",
+			},
+		},
+		"usage": map[string]interface{}{
+			"prompt_tokens":     0,
+			"completion_tokens": 0,
+			"total_tokens":      0,
+		},
+	}
+
+	c.JSON(http.StatusOK, openaiResp)
+}
+
+// createHTTPClient creates an HTTP client with the appropriate TLS config
+func createHTTPClient(cfg *config.ModelConfig) *http.Client {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: cfg.SkipTLSVerify,
+		},
+		ResponseHeaderTimeout: 5 * time.Minute,
+		IdleConnTimeout:       90 * time.Second,
+	}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   5 * time.Minute,
+	}
+}
+
+// generateMessageID creates a unique message ID
+func generateMessageID() string {
+	return "chatcmpl-" + time.Now().Format("20060102150405.000")
 }

@@ -128,6 +128,7 @@ export default function ModelsPage() {
           description: "GPT OSS 120b via vLLM",
           aliases: ["gpt-oss"],
           tags: ["general", "chat", "gpt", "120b", "vllm"],
+          provider: "openai",
           status: "stopped",
           hasStartScript: true,
           hasStopScript: true,
@@ -138,6 +139,7 @@ export default function ModelsPage() {
           description: "External proxy to OpenAI",
           aliases: ["openai", "chatgpt"],
           tags: ["general", "chat", "gpt", "external"],
+          provider: "openai",
           status: "running",
           endpoint: "https://api.openai.com/v1",
           hasStartScript: false,
@@ -149,6 +151,7 @@ export default function ModelsPage() {
           description: "External Ollama server",
           aliases: ["ollama"],
           tags: ["external", "ollama", "chat"],
+          provider: "ollama",
           status: "running",
           endpoint: "https://remote-ollama:11434",
           hasStartScript: false,
@@ -306,6 +309,14 @@ export default function ModelsPage() {
                     <CardDescription>{model.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {model.provider && (
+                      <div className="mb-3">
+                        <span className="text-xs text-gray-500">Provider: </span>
+                        <span className="text-sm text-gray-700 capitalize">
+                          {model.provider}
+                        </span>
+                      </div>
+                    )}
                     {model.aliases.length > 0 && (
                       <div className="mb-3">
                         <span className="text-xs text-gray-500">Aliases: </span>

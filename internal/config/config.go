@@ -96,12 +96,26 @@ type ChatLogCollection struct {
 	Filename  string   `yaml:"filename"`
 }
 
+// ProviderType represents the API provider type for a model
+type ProviderType string
+
+const (
+	// ProviderOpenAI is the OpenAI-compatible API provider (default)
+	ProviderOpenAI ProviderType = "openai"
+	// ProviderOllama is the Ollama API provider
+	ProviderOllama ProviderType = "ollama"
+	// ProviderAnthropic is the Anthropic API provider
+	ProviderAnthropic ProviderType = "anthropic"
+)
+
 // ModelConfig defines a model endpoint configuration
 type ModelConfig struct {
 	Name            string            `yaml:"name"`
 	Description     string            `yaml:"description"`
 	Aliases         []string          `yaml:"aliases,omitempty"`
 	Tags            []string          `yaml:"tags,omitempty"`
+	Provider        ProviderType      `yaml:"provider,omitempty"`
+	ModelName       string            `yaml:"modelName,omitempty"` // The actual model name to send to the backend
 	StartScript     string            `yaml:"startScript,omitempty"`
 	StopScript      string            `yaml:"stopScript,omitempty"`
 	BackendOverride string            `yaml:"backendOverride,omitempty"`
