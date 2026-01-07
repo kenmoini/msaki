@@ -1,4 +1,4 @@
-.PHONY: all build backend frontend dev clean test lint help embed-frontend
+.PHONY: all build backend frontend dev clean test lint help embed-frontend container-build container-push container
 
 # Build variables
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -11,6 +11,13 @@ BIN_DIR := bin
 FRONTEND_DIR := frontend
 FRONTEND_OUT := $(FRONTEND_DIR)/out
 WEB_STATIC := web/static
+
+# Container variables
+CONTAINER_RUNTIME ?= docker
+CONTAINER_REGISTRY ?= quay.io
+CONTAINER_REPO ?= kenmoini/msaki
+CONTAINER_TAG ?= $(VERSION)
+CONTAINER_IMAGE := $(CONTAINER_REGISTRY)/$(CONTAINER_REPO):$(CONTAINER_TAG)
 
 # Default target
 all: build
@@ -113,3 +120,41 @@ deps:
 ## run: Run the application with example config
 run: backend
 	./$(BIN_DIR)/msaki -config configs/msaki.example.yaml
+
+## container-build: Build container image
+container-build:
+	@echo "Building container image $(CONTAINER_IMAGE)..."
+	$(CONTAINER_RUNTIME) build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		-t $(CONTAINER_IMAGE) \
+		-f Dockerfile .
+	@echo "Container image built: $(CONTAINER_IMAGE)"
+
+## container-push: Push container image to registry
+container-push:
+	@echo "Pushing container image $(CONTAINER_IMAGE)..."
+	$(CONTAINER_RUNTIME) push $(CONTAINER_IMAGE)
+	@echo "Container image pushed: $(CONTAINER_IMAGE)"
+
+## container: Build and push container image
+container: container-build container-push
+
+## container-latest: Build and push container image with latest tag
+container-latest: container-tag-latest container-push
+
+## container-tag-latest: Tag and push image as latest
+container-tag-latest: container-build
+	@echo "Tagging $(CONTAINER_IMAGE) as latest..."
+	$(CONTAINER_RUNTIME) tag $(CONTAINER_IMAGE) $(CONTAINER_REGISTRY)/$(CONTAINER_REPO):latest
+	$(CONTAINER_RUNTIME) push $(CONTAINER_REGISTRY)/$(CONTAINER_REPO):latest
+	@echo "Container image pushed as latest"
+
+## container-run: Run container locally for testing
+container-run:
+	@echo "Running container $(CONTAINER_IMAGE)..."
+	$(CONTAINER_RUNTIME) run --rm -it \
+		-p 8080:8080 \
+		-v $(PWD)/configs/msaki.example.yaml:/etc/msaki/msaki.yaml:ro \
+		$(CONTAINER_IMAGE)

@@ -4,7 +4,7 @@ set -e
 
 PORT=$1
 
-source /app/model-scripts/common.sh
+source ./common.sh
 
 docker stop vllm-gpt-oss-120b || true
 docker rm vllm-gpt-oss-120b || true

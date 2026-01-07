@@ -19,3 +19,21 @@ Todo:
 
 - OTel Tracing
 - OIDC Integration
+
+## How to Use
+
+To build and run:
+
+# Development (separate frontend/backend)
+
+```bash
+make dev-backend   # Start Go server on :8080
+make dev-frontend  # Start NextJS on :3000
+```
+
+# Production (embedded frontend)
+
+```bash
+make build         # Builds frontend, copies to web/static, builds Go binary
+./bin/msaki -config configs/msaki.example.yaml
+```

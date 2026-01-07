@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -30,11 +31,18 @@ func main() {
 	configPath := flag.String("config", "configs/msaki.yaml", "Path to configuration file")
 	showVersion := flag.Bool("version", false, "Show version information")
 	noStatic := flag.Bool("no-static", false, "Disable embedded static file serving")
+	healthCheck := flag.Bool("health-check", false, "Perform health check and exit")
+	healthCheckURL := flag.String("health-check-url", "http://localhost:8080/health", "URL for health check")
 	flag.Parse()
 
 	if *showVersion {
 		log.Printf("MSAKI %s (commit: %s, built: %s)", Version, GitCommit, BuildTime)
 		os.Exit(0)
+	}
+
+	// Health check mode for container health checks
+	if *healthCheck {
+		os.Exit(performHealthCheck(*healthCheckURL))
 	}
 
 	// Load configuration
@@ -129,4 +137,26 @@ func main() {
 	}
 
 	log.Println("Server stopped gracefully")
+}
+
+// performHealthCheck makes an HTTP request to the health endpoint and returns exit code
+func performHealthCheck(url string) int {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Health check failed: %v\n", err)
+		return 1
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "Health check failed: status %d\n", resp.StatusCode)
+		return 1
+	}
+
+	fmt.Println("Health check passed")
+	return 0
 }

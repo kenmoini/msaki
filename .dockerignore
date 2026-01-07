@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.html
+coverage.txt
+
+# Frontend development files (not needed - we copy frontend/ explicitly)
+frontend/node_modules
+frontend/.next
+frontend/.env.local
+
+# Web static (rebuilt during container build)
+web/static
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Container files (prevent recursion)
+Containerfile
+Dockerfile
+docker-compose*.yml
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+tmp/
