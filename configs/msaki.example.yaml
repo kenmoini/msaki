@@ -17,11 +17,11 @@ global:
     authentication:
       - name: admin_userpass
         provider: htpasswd
-        path: /etc/msaki/htpasswd_admin
+        path: ./configs/htpasswd_admin
         role: administrator
       - name: chat_users_userpass
         provider: htpasswd
-        path: /etc/msaki/htpasswd_users
+        path: ./configs/htpasswd_users
         role: user
 
   observability:
@@ -83,12 +83,12 @@ models:
       - vllm
     # startScript runs when the model is requested to be loaded
     # If ${PORT} is detected in the script then MSAKI will dynamically provide it a port to use
-    startScript: docker run --rm --name gpt-oss-120b -p ${PORT}:8000 gpt-oss-120b-custom
+    startScript: ./configs/model_scripts/gpt-oss-120b.sh ${PORT}
     # stopScript if provided will allow the model to be stopped and unloaded
-    stopScript: docker stop gpt-oss-120b
+    stopScript: docker stop vllm-gpt-oss-120b
     # backendOverride provides an alternative endpoint to proxy requests to
     # Useful for shell scripts or containers not exposing ports on an accessible network
-    backendOverride: http://192.168.100.10:${PORT}
+    backendOverride: http://192.168.42.111:${PORT}
     # ttl if defined will auto stop and unload the model if there has not been activity sent to it
     ttl: 30m
     # healthCheck defines if MSAKI should detect availability of a model
@@ -96,7 +96,7 @@ models:
     healthCheck:
       enabled: true
       endpoint: /ping
-      startDelay: 240s
+      startDelay: 360s
       interval: 10s
       # retries if a non-zero number will attempt the healthcheck N number of times
       # and finally stop the model if the healthcheck continues to fail

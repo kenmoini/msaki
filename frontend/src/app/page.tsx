@@ -32,6 +32,7 @@ export default function Home() {
           status: "stopped",
           hasStartScript: true,
           hasStopScript: true,
+          healthy: false,
         },
         {
           name: "ext-openapi",
@@ -42,6 +43,7 @@ export default function Home() {
           endpoint: "https://api.openai.com/v1",
           hasStartScript: false,
           hasStopScript: false,
+          healthy: true,
         },
       ]);
     } finally {
