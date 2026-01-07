@@ -114,12 +114,14 @@ func (m *Manager) checkTTLs() {
 	}
 }
 
-// runHealthChecks runs health checks on all running models
+// runHealthChecks runs health checks on all running or starting models
 func (m *Manager) runHealthChecks() {
 	m.mu.RLock()
 	modelsToCheck := make([]*Model, 0)
 	for _, model := range m.models {
-		if model.Status() == StatusRunning && model.Config().HealthCheck.Enabled {
+		status := model.Status()
+		// Run health checks on running models and starting models (after startDelay)
+		if model.Config().HealthCheck.Enabled && (status == StatusRunning || status == StatusStarting) {
 			modelsToCheck = append(modelsToCheck, model)
 		}
 	}
@@ -134,6 +136,17 @@ func (m *Manager) runHealthChecks() {
 func (m *Manager) checkHealth(model *Model) {
 	cfg := model.Config().HealthCheck
 	modelCfg := model.Config()
+	status := model.Status()
+
+	// For starting models, check if startDelay has passed
+	if status == StatusStarting {
+		elapsed := time.Since(model.StartedAt())
+		if elapsed < cfg.StartDelay.Duration {
+			// Still within startDelay, skip health check
+			return
+		}
+	}
+
 	endpoint := m.getModelEndpoint(model)
 	if endpoint == "" {
 		return
@@ -156,14 +169,27 @@ func (m *Manager) checkHealth(model *Model) {
 	resp, err := client.Get(healthURL)
 	if err != nil {
 		model.SetHealthy(false, fmt.Sprintf("Health check failed: %v", err))
+		if status == StatusStarting {
+			log.Printf("Health check for %s failed (still starting): %v", model.Name(), err)
+		}
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		model.SetHealthy(true, "OK")
+		// Transition from starting to running when health check passes
+		if status == StatusStarting {
+			model.SetStatus(StatusRunning)
+			model.UpdateActivity()
+			model.AppendLog("system", "Health check passed, model is now running")
+			log.Printf("Model %s health check passed, transitioning to running", model.Name())
+		}
 	} else {
 		model.SetHealthy(false, fmt.Sprintf("Health check returned %d", resp.StatusCode))
+		if status == StatusStarting {
+			log.Printf("Health check for %s returned %d (still starting)", model.Name(), resp.StatusCode)
+		}
 	}
 }
 
@@ -219,6 +245,7 @@ func (m *Manager) Start(name string) error {
 	// Clear previous logs and set status
 	model.ClearLogs()
 	model.SetStatus(StatusStarting)
+	model.SetStartedAt(time.Now())
 
 	// Allocate port if needed
 	port := 0
@@ -291,11 +318,18 @@ func (m *Manager) Start(name string) error {
 			return
 		}
 
-		model.SetStatus(StatusRunning)
-		model.SetHealthy(true, "Started")
-		model.UpdateActivity()
-		model.AppendLog("system", "Model started successfully")
-		log.Printf("Model %s started successfully", model.Name())
+		// If health check is enabled, stay in StatusStarting and let health checks transition to running
+		// Otherwise, immediately mark as running
+		if model.Config().HealthCheck.Enabled {
+			model.AppendLog("system", "Start script completed, waiting for health check to pass...")
+			log.Printf("Model %s start script completed, waiting for health check", model.Name())
+		} else {
+			model.SetStatus(StatusRunning)
+			model.SetHealthy(true, "Started")
+			model.UpdateActivity()
+			model.AppendLog("system", "Model started successfully")
+			log.Printf("Model %s started successfully", model.Name())
+		}
 	}()
 
 	return nil

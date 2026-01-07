@@ -128,6 +128,11 @@ models:
     backendOverride: http://192.168.42.111:${PORT}
     # ttl if defined will auto stop and unload the model if there has not been activity sent to it
     ttl: 30m
+    # provider specifies what external model provider is being used
+    # Supported values: openai (default), ollama, anthropic
+    # When set to "ollama", requests to /v1/chat/completions are automatically
+    # translated to Ollama's /api/chat format
+    provider: openai
     # healthCheck defines if MSAKI should detect availability of a model
     # This is useful for models that take a long time to load
     healthCheck:

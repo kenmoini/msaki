@@ -25,6 +25,7 @@ type Model struct {
 	statusError  string
 	port         int
 	lastActivity time.Time
+	startedAt    time.Time
 	healthy      bool
 	healthMsg    string
 	scriptLogs   []LogEntry
@@ -119,6 +120,20 @@ func (m *Model) SetPort(port int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.port = port
+}
+
+// StartedAt returns when the model was started
+func (m *Model) StartedAt() time.Time {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.startedAt
+}
+
+// SetStartedAt sets when the model was started
+func (m *Model) SetStartedAt(t time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.startedAt = t
 }
 
 // IsHealthy returns whether the model is healthy
