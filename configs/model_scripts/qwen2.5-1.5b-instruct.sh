@@ -38,4 +38,5 @@ docker run --init --rm --name vllm-qwen2.5-1.5B-instruct \
   nvidia-vllm:25.12-py3 \
   vllm serve \
   'Qwen/Qwen2.5-1.5B-Instruct' \
-  --served-model-name 'Qwen2.5-1.5B-Instruct'
+  --served-model-name 'Qwen2.5-1.5B-Instruct' \
+  --gpu_memory_utilization 0.2

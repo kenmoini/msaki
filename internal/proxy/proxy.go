@@ -89,7 +89,7 @@ func (p *Proxy) Handler(modelName string, endpoint string) gin.HandlerFunc {
 		if err != nil {
 			p.recordError(modelName, "invalid_target")
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "failed to build target URL",
+				"error": "failed to build target URL in Handler : " + err.Error(),
 			})
 			return
 		}
@@ -151,7 +151,7 @@ func (p *Proxy) DynamicHandler(endpoint string) gin.HandlerFunc {
 		if err != nil {
 			p.recordError(modelName, "invalid_target")
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "failed to build target URL",
+				"error": "failed to build target URL in DynamicHandler : " + err.Error(),
 			})
 			return
 		}

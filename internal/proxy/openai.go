@@ -137,7 +137,7 @@ func (p *Proxy) ChatCompletionsHandler() gin.HandlerFunc {
 			p.recordError(req.Model, "invalid_target")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": map[string]interface{}{
-					"message": "failed to build target URL",
+					"message": "failed to build target URL in OpenAI ChatCompletionsHandler : " + err.Error(),
 					"type":    "server_error",
 				},
 			})
@@ -264,7 +264,7 @@ func (p *Proxy) CompletionsHandler() gin.HandlerFunc {
 			p.recordError(req.Model, "invalid_target")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": map[string]interface{}{
-					"message": "failed to build target URL",
+					"message": "failed to build target URL in OpenAI CompletionsHandler " + err.Error(),
 					"type":    "server_error",
 				},
 			})

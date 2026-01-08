@@ -18,7 +18,9 @@ The main capabilities are:
 Todo:
 
 - OTel Tracing
+- RBAC Enhancements
 - OIDC Integration
+- Conversation and model awareness
 
 ## How to Use
 

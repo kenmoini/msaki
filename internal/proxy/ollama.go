@@ -74,7 +74,7 @@ func (p *Proxy) OllamaChatHandler() gin.HandlerFunc {
 		targetURL, err := p.buildTargetURL(cfg, model.Port())
 		if err != nil {
 			p.recordError(req.Model, "invalid_target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build target URL"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build target URL in OllamaChatHandler " + err.Error()})
 			return
 		}
 
@@ -140,7 +140,7 @@ func (p *Proxy) OllamaGenerateHandler() gin.HandlerFunc {
 		targetURL, err := p.buildTargetURL(cfg, model.Port())
 		if err != nil {
 			p.recordError(req.Model, "invalid_target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build target URL"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build target URL in OllamaGenerateHandler " + err.Error()})
 			return
 		}
 
@@ -207,7 +207,7 @@ func (p *Proxy) proxyToOllama(c *gin.Context, model *models.Model, openaiReq *Op
 		p.recordError(openaiReq.Model, "invalid_target")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": map[string]interface{}{
-				"message": "failed to build target URL",
+				"message": "failed to build target URL in proxyToOllama " + err.Error(),
 				"type":    "server_error",
 			},
 		})
