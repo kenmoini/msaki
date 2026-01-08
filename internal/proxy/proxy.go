@@ -188,6 +188,10 @@ func (p *Proxy) buildTargetURL(cfg *config.ModelConfig, port int) (*url.URL, err
 	if baseURL == "" {
 		return nil, fmt.Errorf("no base URL available")
 	}
+	// Replace ${PORT} placeholder with actual port number
+	if port > 0 {
+		baseURL = strings.ReplaceAll(baseURL, "${PORT}", fmt.Sprintf("%d", port))
+	}
 	return url.Parse(baseURL)
 }
 

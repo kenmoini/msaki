@@ -142,6 +142,9 @@ models:
     # When set to "ollama", requests to /v1/chat/completions are automatically
     # translated to Ollama's /api/chat format
     provider: openai
+    # modelName specifies the actual model name to send to the backend
+    # This allows you to expose a friendly name while using a different model internally
+    modelName: Qwen2.5-1.5B-Instruct
     # healthCheck defines if MSAKI should detect availability of a model
     # This is useful for models that take a long time to load
     healthCheck:
