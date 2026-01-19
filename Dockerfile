@@ -14,7 +14,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 COPY frontend/ ./
 
 # Build static export
-RUN npm run build
+RUN npm install && npm run build
 
 # Stage 2: Build the backend
 #FROM docker.io/library/golang:1.25-alpine AS backend-builder
