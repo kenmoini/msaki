@@ -2,3 +2,4 @@ bin/**
 web/static/**
 logs/**
 !.gitkeep
+frontend/package-lock.json
