@@ -67,7 +67,7 @@ LABEL name="msaki" \
       io.openshift.tags="ai,llm,proxy,openai,ollama"
 
 # Install ca-certificates for HTTPS requests to external APIs
-RUN microdnf install -y ca-certificates && \
+RUN microdnf install -y ca-certificates && microdnf update -y \
     microdnf clean all && \
     rm -rf /var/cache/yum
 
