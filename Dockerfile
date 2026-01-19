@@ -1,7 +1,8 @@
 # Stage 1: Build the frontend
-FROM docker.io/library/node:22-alpine AS frontend-builder
-
-WORKDIR /app/frontend
+#FROM docker.io/library/node:22-alpine AS frontend-builder
+FROM registry.access.redhat.com/ubi9/nodejs-22:9.7 AS frontend-builder
+USER 0
+WORKDIR /opt/app-root/src
 
 # Copy frontend package files
 COPY frontend/package.json frontend/package-lock.json ./
@@ -16,10 +17,13 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the backend
-FROM docker.io/library/golang:1.25-alpine AS backend-builder
+#FROM docker.io/library/golang:1.25-alpine AS backend-builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.25 AS backend-builder
+
+USER 0
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+RUN dnf install -y git ca-certificates
 
 WORKDIR /app
 
@@ -31,7 +35,7 @@ RUN go mod download
 COPY . .
 
 # Copy frontend build from previous stage
-COPY --from=frontend-builder /app/frontend/out ./frontend/out
+COPY --from=frontend-builder /opt/app-root/src/out ./frontend/out
 
 # Prepare embedded frontend
 RUN rm -rf web/static && \
@@ -76,9 +80,6 @@ RUN mkdir -p /etc/msaki /var/log/msaki && \
 
 # Copy binary from builder
 COPY --from=backend-builder /app/bin/msaki /usr/local/bin/msaki
-
-# Copy timezone data for proper time handling
-COPY --from=backend-builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Use non-root user
 USER msaki

@@ -1,6 +1,6 @@
 module github.com/kenmoini/msaki
 
-go 1.25.5
+go 1.25.3
 
 require (
 	github.com/gin-contrib/cors v1.7.6
