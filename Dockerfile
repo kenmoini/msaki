@@ -43,7 +43,8 @@ ARG VERSION=dev
 ARG BUILD_TIME
 ARG GIT_COMMIT=unknown
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+#RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN GOOS=linux go build \
     -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT} -s -w" \
     -o /app/bin/msaki \
     ./cmd/msaki
