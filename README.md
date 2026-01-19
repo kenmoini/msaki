@@ -14,13 +14,15 @@ The main capabilities are:
 - Save Chat History
 - Prometheus Metrics
 - Access and Error Logging
+- OTel Tracing
 
 Todo:
 
-- OTel Tracing
-- RBAC Enhancements
-- OIDC Integration
-- Conversation and model awareness
+- Runtime Templates
+- Model Explorer (NGC/HF Browser)
+- [Punted] RBAC Enhancements
+- [Punted] OIDC Integration
+- [Punted] Conversation and model awareness
 
 ## How to Use
 

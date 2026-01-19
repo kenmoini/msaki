@@ -17,6 +17,9 @@ import (
 	"github.com/kenmoini/msaki/internal/metrics"
 	"github.com/kenmoini/msaki/internal/models"
 	"github.com/kenmoini/msaki/internal/proxy"
+	"github.com/kenmoini/msaki/internal/tracing"
+
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 // Server represents the MSAKI HTTP server
@@ -75,6 +78,8 @@ func New(cfg *config.Config, opts ...Option) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
+
+	router.Use(otelgin.Middleware(tracing.TracingServiceName))
 
 	// Add recovery middleware
 	router.Use(gin.Recovery())

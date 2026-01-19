@@ -17,6 +17,7 @@ import (
 	"github.com/kenmoini/msaki/internal/metrics"
 	"github.com/kenmoini/msaki/internal/models"
 	"github.com/kenmoini/msaki/internal/server"
+	"github.com/kenmoini/msaki/internal/tracing"
 	"github.com/kenmoini/msaki/web"
 )
 
@@ -27,6 +28,9 @@ var (
 )
 
 func main() {
+	cleanup := tracing.InitTracer()
+	defer cleanup(context.Background())
+
 	// Parse command line flags
 	configPath := flag.String("config", "configs/msaki.yaml", "Path to configuration file")
 	showVersion := flag.Bool("version", false, "Show version information")
