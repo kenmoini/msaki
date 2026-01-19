@@ -8,7 +8,7 @@ WORKDIR /opt/app-root/src
 COPY frontend/package.json frontend/package-lock.json ./
 
 # Install dependencies
-RUN npm ci
+#RUN npm ci
 
 # Copy frontend source
 COPY frontend/ ./
