@@ -1,8 +1,33 @@
 # Stage 1: Build the frontend
 #FROM docker.io/library/node:22-alpine AS frontend-builder
-FROM registry.access.redhat.com/ubi9/nodejs-22:9.7 AS frontend-builder
+FROM registry.access.redhat.com/ubi9/nodejs-20:9.7 AS frontend-builder
 USER 0
 WORKDIR /opt/app-root/src
+
+# ENV RUST_BACKTRACE=full \
+#     PATH="${PATH}:${PWD}/node_modules/.bin" \
+#     RUST_MIN_STACK=16777216
+# # Build SWC...
+# RUN dnf install -y git gcc lld llvm-toolset gcc-toolset-14 jq && \
+#     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+#     npm install -g corepack deno && \
+#     corepack enable && \
+#     echo "y" | yarn set version stable && \
+#     cp $HOME/.cargo/env /etc/profile.d/cargo.sh && \
+#     source /etc/profile.d/cargo.sh && \
+#     curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# RUN scl enable gcc-toolset-14 bash && \
+#     ln -s /usr/bin/aarch64-redhat-linux-gcc /usr/bin/aarch64-linux-gnu-gcc && \
+#     source /etc/profile.d/cargo.sh && \
+#     git clone https://github.com/swc-project/swc.git && \
+#     cd swc && \
+#     git checkout v1.15.10 && \
+#     git submodule update --init --recursive && \
+#     rustup target add wasm32-wasip1 && \
+#     yarn && \
+#     yarn dlx jest@27 mocha && \
+#     cargo test --all --no-default-features --features swc_v2 --features filesystem_cache
 
 # Copy frontend package files
 #COPY frontend/package.json ./
@@ -14,7 +39,7 @@ WORKDIR /opt/app-root/src
 COPY frontend/ ./
 
 # Build static export
-RUN npm install && npm run build
+RUN npm install --force && npm ci && npm run build
 
 # Stage 2: Build the backend
 #FROM docker.io/library/golang:1.25-alpine AS backend-builder
@@ -67,7 +92,7 @@ LABEL name="msaki" \
       io.openshift.tags="ai,llm,proxy,openai,ollama"
 
 # Install ca-certificates for HTTPS requests to external APIs
-RUN microdnf install -y ca-certificates && microdnf update -y \
+RUN microdnf install -y ca-certificates && microdnf update -y && \
     microdnf clean all && \
     rm -rf /var/cache/yum
 

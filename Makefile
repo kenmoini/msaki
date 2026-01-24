@@ -129,7 +129,7 @@ container-build:
 		--build-arg BUILD_TIME=$(BUILD_TIME) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(CONTAINER_IMAGE) \
-		-f Dockerfile .
+		-f Dockerfile --progress=plain .
 	@echo "Container image built: $(CONTAINER_IMAGE)"
 
 ## container-push: Push container image to registry

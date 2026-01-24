@@ -25,6 +25,7 @@ coverage.txt
 frontend/node_modules
 frontend/.next
 frontend/.env.local
+frontend/out
 
 # Web static (rebuilt during container build)
 web/static
